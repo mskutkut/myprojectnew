@@ -13,7 +13,7 @@ on:
         required: true
       GIT_BRANCH:
         description: 'Git Branch to checkout'
-        default: 'master'
+        default: 'main'  # Changed from 'master' to 'main'
         required: true
       GIT_REPO:
         description: 'Git repository'
