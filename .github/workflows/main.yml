@@ -1,4 +1,4 @@
-""name: Deploy Node App to AKS (Azure Kubernetes Service)
+name: Deploy Node App to AKS (Azure Kubernetes Service)
 
 on:
   workflow_dispatch:
