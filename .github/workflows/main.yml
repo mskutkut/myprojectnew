@@ -15,6 +15,10 @@ on:
         description: 'Git Branch to checkout'
         default: 'main'
         required: true
+      GIT_REPO:
+        description: 'Git repository (e.g. mskutkut/myprojectnew)'
+        default: 'mskutkut/myprojectnew'
+        required: true
 
 env:
   RESOURCE_GROUP: ${{ github.event.inputs.RESOURCE_GROUP }}
@@ -28,6 +32,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
+          repository: ${{ github.event.inputs.GIT_REPO }}
           ref: ${{ github.event.inputs.GIT_BRANCH }}
 
       - name: Azure Login
@@ -35,9 +40,26 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
+      - name: Create Resource Group if not exists
+        run: |
+          echo "Checking/Creating resource group..."
+          az group show --name $RESOURCE_GROUP || az group create --name $RESOURCE_GROUP --location eastus
+
+      - name: Create AKS Cluster if not exists
+        run: |
+          echo "Checking/Creating AKS cluster..."
+          if ! az aks show --name $CLUSTER_NAME --resource-group $RESOURCE_GROUP &> /dev/null; then
+            az aks create \
+              --resource-group $RESOURCE_GROUP \
+              --name $CLUSTER_NAME \
+              --node-count 1 \
+              --generate-ssh-keys
+          else
+            echo "AKS cluster already exists."
+          fi
+
       - name: Get AKS Credentials
         run: az aks get-credentials --resource-group $RESOURCE_GROUP --name $CLUSTER_NAME --overwrite-existing
 
       - name: Deploy to AKS using kubectl
-        run: |
-          kubectl apply -f deployment.yaml
+        run: kubectl apply -f deployment.yaml
