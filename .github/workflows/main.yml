@@ -16,8 +16,8 @@ on:
         default: 'main'
         required: true
       GIT_REPO:
-        description: 'Git repository'
-        default: 'mskutkut/your-node-app'
+        description: 'Git repository (e.g. mskutkut/myprojectnew)'
+        default: 'mskutkut/myprojectnew'
         required: true
 
 env:
@@ -40,16 +40,18 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
+      - name: Install kubectl via Azure CLI
+        run: az aks install-cli
+
+      - name: Create Resource Group if not exists
+        run: |
+          echo "Checking/Creating resource group..."
+          az group show --name $RESOURCE_GROUP || az group create --name $RESOURCE_GROUP --location eastus
+
       - name: Create AKS Cluster if not exists
         run: |
           echo "Checking/Creating AKS cluster..."
-          if ! az group show --name $RESOURCE_GROUP &> /dev/null; then
-            echo "Creating resource group..."
-            az group create --name $RESOURCE_GROUP --location eastus
-          fi
-
           if ! az aks show --name $CLUSTER_NAME --resource-group $RESOURCE_GROUP &> /dev/null; then
-            echo "Creating AKS cluster..."
             az aks create \
               --resource-group $RESOURCE_GROUP \
               --name $CLUSTER_NAME \
@@ -63,6 +65,16 @@ jobs:
       - name: Get AKS Credentials
         run: az aks get-credentials --resource-group $RESOURCE_GROUP --name $CLUSTER_NAME --overwrite-existing
 
-      - name: Deploy to AKS using kubectl
+      - name: Deploy Kubernetes Deployment
+        run: kubectl apply -f deployment.yaml
+
+      - name: Deploy Kubernetes Service (if available)
         run: |
-          kubectl apply -f deployment.yaml
+          if [ -f service.yaml ]; then
+            kubectl apply -f service.yaml
+          else
+            echo "No service.yaml found. Skipping service deployment."
+          fi
+
+      - name: Verify Deployment
+        run: kubectl get all
