@@ -1,0 +1,77 @@
+""name: Deploy Node App to AKS (Azure Kubernetes Service)
+
+on:
+  workflow_dispatch:
+    inputs:
+      RESOURCE_GROUP:
+        description: 'Azure Resource Group'
+        default: 'my-aks-resource-group'
+        required: true
+      CLUSTER_NAME:
+        description: 'AKS Cluster Name'
+        default: 'my-aks-cluster'
+        required: true
+      GIT_BRANCH:
+        description: 'Git Branch to checkout'
+        default: 'master'
+        required: true
+      GIT_REPO:
+        description: 'Git repository'
+        default: 'mskutkut/node-todo-cicd'
+        required: true
+
+env:
+  RESOURCE_GROUP: ${{ github.event.inputs.RESOURCE_GROUP }}
+  CLUSTER_NAME: ${{ github.event.inputs.CLUSTER_NAME }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.inputs.GIT_BRANCH }}
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Set up Azure CLI and kubectl
+        run: |
+          az aks install-cli
+
+      - name: Get AKS Credentials
+        run: |
+          az aks get-credentials --resource-group $RESOURCE_GROUP --name $CLUSTER_NAME --overwrite-existing
+
+      - name: Deploy Node Application
+        run: |
+          echo "Deploying node application"
+          kubectl apply -f deployment.yaml
+
+      - name: Check Kubernetes Service
+        run: kubectl get services todo-service
+
+      - name: Wait for External IP
+        run: |
+          echo "Waiting for external IP..."
+          for i in {1..60}; do
+            EXTERNAL_IP=$(kubectl get svc todo-service -o jsonpath="{.status.loadBalancer.ingress[0].ip}")
+            if [ -n "$EXTERNAL_IP" ]; then
+              echo "Service is available at: http://$EXTERNAL_IP"
+              break
+            else
+              echo "Still waiting for External IP... ($i/60)"
+              sleep 15
+            fi
+          done
+          if [ -z "$EXTERNAL_IP" ]; then
+            echo "Failed to get External IP"
+            exit 1
+          fi
+
+      - name: Get Kubernetes Pods
+        run: kubectl get pods -o wide
