@@ -9,7 +9,7 @@ on:
         required: true
       CLUSTER_NAME:
         description: 'AKS Cluster Name'
-        default: 'example-aks-cluster'
+        default: 'dev-aks-cluster'
         required: true
       GIT_BRANCH:
         description: 'Git Branch to checkout'
